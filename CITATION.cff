@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite the article."
+title: "Test Twice, Ship Once: code and data"
+authors:
+  - family-names: Kuraś
+    given-names: Paweł
+  - family-names: Strzałka
+    given-names: Dominik
+  - family-names: Misiura
+    given-names: Faustyna
+license: MIT
+preferred-citation:
+  type: article
+  title: "Test Twice, Ship Once: The Optimizer's Curse in Iterative Tuning of Queue Configurations under Chaotic and Heavy-Tailed Traffic"
+  authors:
+    - family-names: Kuraś
+      given-names: Paweł
+    - family-names: Strzałka
+      given-names: Dominik
+    - family-names: Misiura
+      given-names: Faustyna
+  year: 2026
