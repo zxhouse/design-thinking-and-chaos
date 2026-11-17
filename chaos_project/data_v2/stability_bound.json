@@ -1,0 +1,74 @@
+{
+ "grid": 75,
+ "constant_52": {
+  "n_certified": 8512,
+  "n_always_idle": 8512,
+  "violations": 0,
+  "median_bound": -0.16251892949777494,
+  "median_lle": -0.8614642548314022
+ },
+ "constant_60": {
+  "n_certified": 3802,
+  "n_always_idle": 3802,
+  "violations": 0,
+  "median_bound": 2.074747097881754,
+  "median_lle": -0.0914954915897242
+ },
+ "poisson_orig": {
+  "violations": 0,
+  "runs": 262144,
+  "frac_runs_certified": 0.1097564697265625,
+  "n_configs_certified_all_seeds": 1245,
+  "n_configs_certified_majority": 1806,
+  "frac_runs_lle_negative": 0.9998626708984375,
+  "median_idle_fraction": 0.14285714285714285,
+  "idle_fraction_certified_min": 0.8114285714285714,
+  "idle_fraction_uncertified_max": 0.9542857142857143,
+  "certified_by_slope": {
+   "0.05": 0.255401611328125,
+   "0.15": 0.0620269775390625,
+   "0.25": 0.0608062744140625,
+   "0.35": 0.060791015625
+  },
+  "median_bound": 1.80840429949553,
+  "median_lle": -0.5026414546729412
+ },
+ "self_similar_orig": {
+  "violations": 0,
+  "runs": 262144,
+  "frac_runs_certified": 0.017826080322265625,
+  "n_configs_certified_all_seeds": 0,
+  "n_configs_certified_majority": 222,
+  "frac_runs_lle_negative": 0.9993629455566406,
+  "median_idle_fraction": 0.22,
+  "idle_fraction_certified_min": 0.8114285714285714,
+  "idle_fraction_uncertified_max": 0.9571428571428572,
+  "certified_by_slope": {
+   "0.05": 0.0700531005859375,
+   "0.15": 0.000518798828125,
+   "0.25": 0.0003662109375,
+   "0.35": 0.0003662109375
+  },
+  "median_bound": 1.6486202312011777,
+  "median_lle": -0.616702547009726
+ },
+ "chaos_orig": {
+  "violations": 0,
+  "runs": 262144,
+  "frac_runs_certified": 0.0,
+  "n_configs_certified_all_seeds": 0,
+  "n_configs_certified_majority": 0,
+  "frac_runs_lle_negative": 0.9804420471191406,
+  "median_idle_fraction": 0.014285714285714285,
+  "idle_fraction_certified_min": null,
+  "idle_fraction_uncertified_max": 0.7485714285714286,
+  "certified_by_slope": {
+   "0.05": 0.0,
+   "0.15": 0.0,
+   "0.25": 0.0,
+   "0.35": 0.0
+  },
+  "median_bound": 2.112867483264858,
+  "median_lle": -0.10405855847005413
+ }
+}

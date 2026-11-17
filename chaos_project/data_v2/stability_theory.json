@@ -1,0 +1,174 @@
+{
+ "constant_input": {
+  "52": {
+   "max_residual": 1.4210854715202004e-14,
+   "cases": {
+    "00": 8512,
+    "01": 6912,
+    "02": 0,
+    "10": 960,
+    "11": 0,
+    "12": 0,
+    "20": 0,
+    "21": 0,
+    "22": 0
+   },
+   "pacing_floor": 0,
+   "n_linearly_unstable": 0,
+   "n_settled": 16384,
+   "stable_and_not_settled": 0,
+   "unstable_and_settled": 0,
+   "n_lle_positive": 0,
+   "lle_positive_and_linearly_stable": 0,
+   "max_rho_where_lle_neg_settled": 0.9268111287075121,
+   "unstable_by_slope": {
+    "0.05": 0,
+    "0.15": 0,
+    "0.25": 0,
+    "0.35": 0
+   },
+   "main_case": 960,
+   "main_case_max_abs_diff_rho": 3.5397604847275943e-09,
+   "main_case_unstable": 0,
+   "main_case_unstable_with_gain_lt_2": 0,
+   "main_case_stable_with_gain_gt_2": 0,
+   "corr_lnrho_lle_stable": 0.9901156943492355
+  },
+  "60": {
+   "max_residual": 1.4210854715202004e-14,
+   "cases": {
+    "00": 3802,
+    "01": 9528,
+    "02": 0,
+    "10": 2535,
+    "11": 408,
+    "12": 0,
+    "20": 111,
+    "21": 0,
+    "22": 0
+   },
+   "pacing_floor": 0,
+   "n_linearly_unstable": 0,
+   "n_settled": 16384,
+   "stable_and_not_settled": 0,
+   "unstable_and_settled": 0,
+   "n_lle_positive": 0,
+   "lle_positive_and_linearly_stable": 0,
+   "max_rho_where_lle_neg_settled": 0.9592562492069343,
+   "unstable_by_slope": {
+    "0.05": 0,
+    "0.15": 0,
+    "0.25": 0,
+    "0.35": 0
+   },
+   "main_case": 2535,
+   "main_case_max_abs_diff_rho": 2.289224032558934e-09,
+   "main_case_unstable": 0,
+   "main_case_unstable_with_gain_lt_2": 0,
+   "main_case_stable_with_gain_gt_2": 0,
+   "corr_lnrho_lle_stable": 0.9927420999742312
+  },
+  "70": {
+   "max_residual": 2.842170943040401e-14,
+   "cases": {
+    "00": 585,
+    "01": 10212,
+    "02": 0,
+    "10": 3270,
+    "11": 1800,
+    "12": 0,
+    "20": 397,
+    "21": 120,
+    "22": 0
+   },
+   "pacing_floor": 0,
+   "n_linearly_unstable": 280,
+   "n_settled": 16032,
+   "stable_and_not_settled": 72,
+   "unstable_and_settled": 0,
+   "n_lle_positive": 25,
+   "lle_positive_and_linearly_stable": 0,
+   "max_rho_where_lle_neg_settled": 0.9664951017192487,
+   "unstable_by_slope": {
+    "0.05": 0,
+    "0.15": 0,
+    "0.25": 0,
+    "0.35": 280
+   },
+   "main_case": 3270,
+   "main_case_max_abs_diff_rho": 3.5584666324695036e-09,
+   "main_case_unstable": 280,
+   "main_case_unstable_with_gain_lt_2": 0,
+   "main_case_stable_with_gain_gt_2": 0,
+   "corr_lnrho_lle_stable": 0.9999988962312162
+  },
+  "80": {
+   "max_residual": 2.842170943040401e-14,
+   "cases": {
+    "00": 117,
+    "01": 8819,
+    "02": 48,
+    "10": 3320,
+    "11": 3152,
+    "12": 0,
+    "20": 488,
+    "21": 440,
+    "22": 0
+   },
+   "pacing_floor": 0,
+   "n_linearly_unstable": 1045,
+   "n_settled": 15218,
+   "stable_and_not_settled": 121,
+   "unstable_and_settled": 0,
+   "n_lle_positive": 277,
+   "lle_positive_and_linearly_stable": 3,
+   "max_rho_where_lle_neg_settled": 0.9898743539223946,
+   "unstable_by_slope": {
+    "0.05": 0,
+    "0.15": 0,
+    "0.25": 245,
+    "0.35": 800
+   },
+   "main_case": 3320,
+   "main_case_max_abs_diff_rho": 2.995058978605414e-08,
+   "main_case_unstable": 941,
+   "main_case_unstable_with_gain_lt_2": 0,
+   "main_case_stable_with_gain_gt_2": 35,
+   "corr_lnrho_lle_stable": 0.9999946741872283
+  },
+  "90": {
+   "max_residual": 2.842170943040401e-14,
+   "cases": {
+    "00": 3,
+    "01": 7160,
+    "02": 109,
+    "10": 3280,
+    "11": 4419,
+    "12": 37,
+    "20": 560,
+    "21": 804,
+    "22": 12
+   },
+   "pacing_floor": 0,
+   "n_linearly_unstable": 1872,
+   "n_settled": 14284,
+   "stable_and_not_settled": 228,
+   "unstable_and_settled": 0,
+   "n_lle_positive": 922,
+   "lle_positive_and_linearly_stable": 26,
+   "max_rho_where_lle_neg_settled": 0.9960626746754212,
+   "unstable_by_slope": {
+    "0.05": 0,
+    "0.15": 0,
+    "0.25": 752,
+    "0.35": 1120
+   },
+   "main_case": 3280,
+   "main_case_max_abs_diff_rho": 2.5667211467350626e-08,
+   "main_case_unstable": 1424,
+   "main_case_unstable_with_gain_lt_2": 0,
+   "main_case_stable_with_gain_gt_2": 20,
+   "corr_lnrho_lle_stable": 0.9995852307596265
+  }
+ }
+}

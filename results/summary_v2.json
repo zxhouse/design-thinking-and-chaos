@@ -44,14 +44,14 @@
   "argmax_perf_lle": 0.2605
  },
  "dyn_input_lle": [
-  0.3398,
-  0.0557
+  0.3536,
+  0.0149
  ],
  "dyn_queue_lle": [
-  0.5928,
-  0.0509
+  0.6174,
+  0.0159
  ],
- "dyn_corr": -0.0341,
+ "dyn_corr": 0.0062,
  "sweep_constant_max_lle": 0.2047,
  "sweep_constant_frac_pos": 0.0923,
  "sweep_constant_max_q1_range": 1.5332,

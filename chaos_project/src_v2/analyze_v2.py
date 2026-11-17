@@ -47,6 +47,9 @@ for k, g in gt.items():
 # ---------------- dynamics ----------------
 dyn = load("dynamics")
 iq = np.array(dyn["input_vs_queue"])
+_dep = os.path.join(DATA, "input_queue_dependence.json")
+if os.path.exists(_dep):  # 400-seed version of the same experiment (input_queue_dependence.py)
+    iq = np.array(json.load(open(_dep))["pairs"])[:, :2]
 summary["dyn_input_lle"] = ci(iq[:, 0])
 summary["dyn_queue_lle"] = ci(iq[:, 1])
 summary["dyn_corr"] = float(np.corrcoef(iq[:, 0], iq[:, 1])[0, 1])
@@ -146,12 +149,12 @@ plt.close()
 
 # ---------------- Figure: dynamics ----------------
 fig, ax = plt.subplots(1, 3, figsize=(10.5, 3.9))
-ax[0].scatter(iq[:, 0], iq[:, 1], s=14, color=C["red"])
+ax[0].scatter(iq[:, 0], iq[:, 1], s=6, color=C["red"], alpha=0.6, lw=0)
 lim = [min(iq.min(), 0), iq.max() * 1.05]
 ax[0].plot(lim, lim, color=C["grey"], lw=.8, ls=":")
 ax[0].set_xlabel("Lyapunov estimate of the arrival series")
 ax[0].set_ylabel("Lyapunov estimate of queue $q_1$")
-ax[0].set_title("(a) Input vs. queue, 40 seeds")
+ax[0].set_title(f"(a) Input vs. queue, {len(iq)} seeds")
 for inp, col in [("constant", C["blue"]), ("poisson", C["violet"])]:
     for tau, ls in [(1, ":"), (5, "-"), (40, "--")]:
         rows = [r for r in sw if r["input"] == inp and r["tau"] == tau]

@@ -1,0 +1,14 @@
+{
+ "chaos": {
+  "median_empty_flagged": 0.49142857142857144,
+  "median_empty_unflagged": 0.8457142857142858
+ },
+ "poisson": {
+  "median_empty_flagged": 0.34285714285714286,
+  "median_empty_unflagged": 0.9942857142857143
+ },
+ "self_similar": {
+  "median_empty_flagged": 0.4942857142857143,
+  "median_empty_unflagged": 0.9342857142857143
+ }
+}
