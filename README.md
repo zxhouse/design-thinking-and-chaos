@@ -55,6 +55,8 @@ python3 hurst_analysis.py       # stationarity, tails and Hurst index of long se
 python3 stability_theory.py     # fixed points, Jacobians and characteristic roots, Propositions 1-2 (~1 min)
 python3 stability_bound.py      # upper bound on the model exponent, Proposition 3 (~6 min; run after stability_theory.py)
 python3 empty_queue.py
+python3 precision_check.py      # single, double and 50-digit arithmetic compared (Section 5.1.4, a few seconds)
+python3 input_precision.py      # the same for the logistic-map traffic generator (Section 5.1.4, ~1 min)
 ```
 
 then run the quick check above.
@@ -65,6 +67,7 @@ then run the quick check above.
 |---|---|---|
 | Section 5.1, Figs. 2-3 | `experiments_v2.py dynamics`, `round2_osc.py`, `overload_dynamics.py`, `indicator_check.py` | `dynamics.json`, `round2_osc.json`, `overload_dynamics.json`, `overload_orbits.npz`, `indicator_check.json` |
 | Section 3 (Propositions 1-3), Appendix A, Sections 5.1-5.2 | `stability_theory.py`, `stability_bound.py` | `stability_theory.json`, `stability_fixed_*.npy`, `stability_bound.json`, `stability_bound_*.npy` |
+| Section 5.1.4 | `precision_check.py`, `input_precision.py` | `precision_check.json`, `input_precision.json` |
 | Section 5.2, Fig. 4 | `indicator_check.py`, `input_queue_dependence.py`, `empty_queue.py` | `indicator_check.json`, `model_lle_*.npy`, `input_queue_dependence.json`, `empty_queue.json` |
 | Section 5.3, Table 2, Fig. 5 | `hurst_analysis.py` | `hurst_analysis.json`, `hurst_curves.npz` |
 | Section 5.4, Table 3, Fig. 6 | `experiments_v2.py ground_truth`, `separation_v2.py`, `indicator_check.py` | `gt_*.npy`, `model_lle_*.npy` |

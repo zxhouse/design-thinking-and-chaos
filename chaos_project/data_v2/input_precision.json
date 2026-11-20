@@ -1,0 +1,81 @@
+{
+ "n_configs": 301,
+ "seeds": 16,
+ "steps": 400,
+ "series": {
+  "f32_first_difference_min": 16,
+  "f32_first_difference_median": 25.0,
+  "f32_first_difference_max": 32,
+  "f32_share_equal_values": 0.08781249999999999,
+  "f64_first_difference_min": 55,
+  "f64_first_difference_median": 65.5,
+  "f64_first_difference_max": 77,
+  "f64_share_equal_values": 0.18609374999999997,
+  "f32": {
+   "mean": 59.29140625,
+   "sd": 21.30779466879341,
+   "PE4": 0.7082986340902488,
+   "lag1": -0.5031231236001459
+  },
+  "f64": {
+   "mean": 59.4409375,
+   "sd": 21.201671788354187,
+   "PE4": 0.7059451537537282,
+   "lag1": -0.5078400446438089
+  },
+  "mp": {
+   "mean": 59.36234375,
+   "sd": 21.251223217895856,
+   "PE4": 0.706784248354069,
+   "lag1": -0.5097227324318857
+  }
+ },
+ "scores": {
+  "f32_performance": {
+   "mean_diff_pct_of_optimum": 0.04182148033773463,
+   "ci95_pct": 0.01001791286760588,
+   "mean_abs_diff_pct": 0.07731673157679755,
+   "max_abs_diff_pct": 0.27206908478282815,
+   "share_within_2se": 1.0,
+   "spearman": 0.999910232998174
+  },
+  "f32_penalised": {
+   "mean_diff_pct_of_optimum": 0.3039083499265036,
+   "ci95_pct": 0.14960142423024916,
+   "mean_abs_diff_pct": 0.7291607907943028,
+   "max_abs_diff_pct": 5.106521701474832,
+   "share_within_2se": 0.9933554817275747,
+   "spearman": 0.9888380893709712
+  },
+  "f32_flag_rate": [
+   0.6735880398671097,
+   0.6897840531561462
+  ],
+  "f64_performance": {
+   "mean_diff_pct_of_optimum": -0.08884089272072333,
+   "ci95_pct": 0.007546822400952303,
+   "mean_abs_diff_pct": 0.09933309121967027,
+   "max_abs_diff_pct": 0.26662633639954264,
+   "share_within_2se": 1.0,
+   "spearman": 0.9999177135816595
+  },
+  "f64_penalised": {
+   "mean_diff_pct_of_optimum": -0.08212071657742107,
+   "ci95_pct": 0.136362854695912,
+   "mean_abs_diff_pct": 0.6383521646766906,
+   "max_abs_diff_pct": 7.211218438884727,
+   "share_within_2se": 0.9867109634551495,
+   "spearman": 0.9918329629711118
+  },
+  "f64_flag_rate": [
+   0.6893687707641196,
+   0.6897840531561462
+  ]
+ },
+ "f64_matches_ground_truth": 0.0,
+ "best_config_rank": {
+  "f32": 1,
+  "f64": 1,
+  "mp": 1
+ }
+}
