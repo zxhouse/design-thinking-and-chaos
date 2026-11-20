@@ -1,0 +1,349 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs,array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[round,authoryear]{natbib}
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.6cm,right=2.6cm]{geometry}
+\usepackage[colorlinks=true,linkcolor={blue!60!black},citecolor={green!45!black},urlcolor={blue!60!black}]{hyperref}
+
+\newtheorem{proposition}{Proposition}
+\newcommand{\pp}{\,\text{pp}}
+
+\title{\textbf{Test Twice, Ship Once: The Optimizer's Curse in Iterative Tuning of Queue Configurations under Chaotic and Heavy-Tailed Traffic}}
+\author{
+  Pawe{\l} Kura{\'s}$^{1}$, Dominik Strza{\l}ka$^{2,*}$, Faustyna Misiura$^{3}$\\[1ex]
+  \small $^{1}$Institute of Informatics, Kozminski University, Warsaw, Poland\\
+  \small $^{2}$Department of Complex Systems, Rzesz{\'o}w University of Technology, Rzesz{\'o}w, Poland\\
+  \small $^{3}$Department of Technical Sciences, Uczelnia Pa{\'n}stwowa im.\ Jana Grodka w Sanoku, Sanok, Poland\\[0.5ex]
+  \small $^{*}$Corresponding author: \texttt{strzalka@prz.edu.pl}
+}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A network controller that tunes buffer and drop settings by trial and error must choose among configurations it has measured only briefly, so it tends to pick the one that got lucky. We study this optimizer's curse in a simulated pair of switches with delayed loss feedback, fourteen binary settings and three kinds of traffic: Poisson, a chaotic logistic-map input and heavy-tailed ON/OFF sources. We computed the true utility of all 16,384 configurations and the Lyapunov exponent of the model itself, so we know what the controller believes, what it ships and what is actually unstable. At the operating load no configuration is unstable; chaos with a low-dimensional attractor appears only under overload and steep drop curves. Short-window Lyapunov estimates (Rosenstein, Kantz, Wolf) are nevertheless positive in most tests, because they track the irregularity of a driven queue, not instability. The heavy-tailed input has Hurst exponent $H\approx0.83$ at the scales a test sees. The curse follows the noise of the score. Penalising a positive Lyapunov estimate makes a single test more than ten times noisier, and a controller that then tests every candidate once overestimates its choice by 9\% of the optimum. Testing once was the worst use of the budget in every regime: under chaotic forcing, three new configurations and two re-tests per five tests shipped 4.1 percentage points more after 100 rounds. Convergence theory carries over, and with instability measured by the model's exponent the limit is also stable.
+\end{abstract}
+
+\noindent\textbf{Keywords:} optimizer's curse; online configuration tuning; active queue management; chaotic forcing; heavy-tailed traffic; Lyapunov exponent estimation; permutation entropy; Hurst index.
+
+\vspace{1em}
+\noindent\fbox{\parbox{0.96\textwidth}{\small
+\textbf{Lead paragraph.} Automated controllers increasingly tune network settings by trying them and keeping what works. When the traffic is irregular, a short trial is a noisy measurement, and the configuration that looks best is often the one that was measured on a good day. We built a small simulated network in which the true quality and the true stability of every configuration are known, and watched how badly such a controller is fooled. Genuine chaos in the queues needs overload; at normal load the usual short-window chaos estimates mistake irregular traffic for instability, and penalising them makes every score noisier. The cure is old-fashioned: re-test the leaders. In the hardest case we studied, spending two of every five tests on re-tests recovered most of what a test-once controller lost; in milder cases any re-testing helped.}}
+
+\section{Introduction}
+\label{sec:intro}
+
+Networks are increasingly tuned by software that proposes a configuration, runs it on live traffic for a while, scores the result and moves on. The settings it touches, such as buffer sizes and the thresholds of active queue management (AQM) \citep{floyd1993random,nichols2012codel,pan2013pie}, shape how queues respond to load. Much of this tuning is now done by learning systems. Machine learning is used to model and predict traffic, to detect anomalies and to control congestion \citep{boutaba2018comprehensive,pang2021deep,huang2021machine}. Learned congestion controllers \citep{jay2019deep,abbasloo2020classic}, graph-neural models of whole networks \citep{rusek2020routenet} and generative models of traffic traces \citep{lin2020using,yin2022practical} have largely replaced the stochastic traffic models and fluid equations of the 1990s and 2000s as the working tools of the field.
+
+Why, then, study a stochastic, dynamical model of two queues? We see three reasons. First, some failures are built into a protocol, not visible in its data. The classic example is TCP with RED, whose equilibrium loses stability and becomes chaotic as delay or drop slope grow \citep{ranjan2004nonlinear,low2002internet}. More recent examples are the unfairness and instability of BBR \citep{ware2019modeling,scherrer2022model} and the starvation that delay-based congestion controllers can cause \citep{arun2022starvation}. All of these were found by analysing models. An anomaly detector trained on normal behaviour cannot flag them, because to such a detector a design that is unstable everywhere looks normal \citep{sommer2010outside}. Second, a learning controller is itself an iterate--test loop. It proposes settings, measures them on short windows of irregular traffic and keeps the best, so it is exposed to the same selection bias as any other search. That bias can only be measured when the true quality of every option is known, which requires a model. Third, the statistical character of the traffic decides how noisy each measurement is. Long-range dependence still shapes Internet traffic \citep{fontugne2017scaling}, and the estimate of the Hurst index depends on the model and the traffic pattern \citep{dymora2020influence}, so its role has to be checked, not assumed.
+
+This paper therefore stays on the classical, non-AI side of the problem. We take a deterministic mathematical model, compute its behaviour, test whether it is sensitive to initial conditions and draw its attractors. Such evidence has a known weak point. A chaotic map is iterated on hardware with finite precision, rounding errors grow at the rate of the Lyapunov exponent, and after a few hundred steps a computed trajectory is no longer the trajectory of the equations \citep{hammel1987numerical}. Chaos cannot be proved this way; it can only be supported by evidence such as exponents and attractors. We therefore also check which of our results change when the arithmetic changes (Section~\ref{sec:precision}).
+
+The loop itself looks like design by prototyping: generate variants close to what works, test them, keep the best. For the static version of that loop the theory is settled. \citet{kuras2026when} show that it converges to a local optimum when the search space is finite, ideas are local, improving ideas keep coming, tests are unbiased and repeated, and nothing tested is thrown away. Networks are not static. Queues coupled through delayed congestion feedback can oscillate and even become chaotic \citep{ranjan2004nonlinear,chen2004controlling,guo2008hopf}, and aggregated traffic is bursty on many time scales \citep{leland1994selfsimilar,willinger1997selfsim}. Both make a short test a poor measurement. A controller that picks the best of many poor measurements suffers the optimizer's curse \citep{smithwinkler2006}: the winner's score is biased upwards, and the winner itself is often not the best candidate.
+
+This paper asks how large that effect is for a configuration controller, what it is caused by and what to do about it. We answer in a model small enough to be solved exactly: two switches, fourteen binary settings and three kinds of traffic. For each regime we computed the true utility of every one of the 16,384 configurations. That lets us compare, round by round, what the controller believes, what it would ship and the best thing it has already tested. Because we have the model, we can also measure instability directly, as the Lyapunov exponent of the system rather than of a time series, and check what the usual series-based estimators actually detect.
+
+Our findings are as follows.
+\begin{enumerate}[leftmargin=*,itemsep=2pt]
+\item \textbf{At the operating load the queues are stable; chaos needs overload} (Section~\ref{sec:dyn}). With a constant input, none of the 16,384 configurations has a positive Lyapunov exponent at loads up to 60 packets per step. Under overload, 1.7--5.6\% do, all with steep drop curves. Linear stability analysis of the unique fixed point gives the same picture and an explicit gain condition. Their attractors are low-dimensional (correlation dimension about 1) and are reached through quasi-periodic oscillations.
+\item \textbf{Short-window Lyapunov estimates measure irregularity, not instability} (Section~\ref{sec:indicator}). At the operating load the Rosenstein, Kantz and Wolf estimates are positive in 81--99\% of test-length runs, while the model's own exponent is negative in 95--100\%. The indicator follows the permutation entropy of the queue (rank correlation 0.83). Under chaotic forcing the queue is a stable function of its chaotic input.
+\item \textbf{The heavy-tailed input has the intended memory where a test can see it} (Section~\ref{sec:hurst}). Four Hurst estimators give $H=0.82$--$0.84$ at scales of 8--512 steps, close to the nominal $0.82$. Beyond the longest ON/OFF period the estimates fall towards $0.5$.
+\item \textbf{The curse follows the noise of the score} (Section~\ref{sec:curse}). Penalising a positive Lyapunov estimate can raise the noise of a single test more than tenfold. Under chaotic forcing a test-once controller then overestimates its choice by 9\% of the optimum. Without the penalty the bias is below 0.3\%.
+\item \textbf{Testing once is the worst allocation} (Sections~\ref{sec:alloc}--\ref{sec:robust}). With five tests per round under chaotic forcing, three new configurations and two re-tests ship 4.1 points more than five new ones after 100 rounds and 3.5 points more than random search. In the other regimes re-testing still beats testing once, by 0.3--1.7 points, but how many of the five tests go to re-tests matters little, and with a corrected drop policy no local policy beats random search.
+\item \textbf{The limit is stable, but only by the right criterion} (Section~\ref{sec:landscape}). Convergence theory carries over unchanged, because repeated tests in our set-up are independent. With instability defined by the model's exponent, every local optimum is stable and the separation condition of Proposition~\ref{prop:sep} holds in all regimes. With instability defined by the short-window indicator, it fails.
+\end{enumerate}
+
+In the successive parts of the paper, the following issues are considered: Section~\ref{sec:related} reviews related work, Section~\ref{sec:model} describes the model and Section~\ref{sec:theory} the controller and what theory guarantees. Section~\ref{sec:results} reports the results, and Section~\ref{sec:discussion} discusses them.
+
+\input{part_related.tex}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{fig_schema.pdf}
+\caption{The simulated system. A sender feeds an edge switch $S_1$, whose output joins cross-traffic at a core switch $S_2$. Loss at both switches reaches the sender after $\tau=5$ steps and reduces its rate. The controller sets the fourteen configuration bits and sees one score per test.}
+\label{fig:topology}
+\end{figure}
+
+\input{part_model.tex}
+
+\section{Results}
+\label{sec:results}
+
+Unless stated otherwise, intervals are 95\% confidence half-widths over 100 replications. Comparisons between policies are paired, because every policy uses the same 100 seeds and the same starting configuration. Utilities are given as a percentage of the global optimum of the objective being optimised.
+
+\subsection{Is the chaos in the queues?}
+\label{sec:dyn}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_dynamics.pdf}
+\caption{(a) Short-window indicator of the logistic-map arrival series against that of the edge queue it drives, 400 seeds, one fixed configuration (bits \texttt{00101000010010}) at load 55. The two are unrelated (Section~\ref{sec:indicator}). (b) The same configuration with constant and Poisson input, over load and feedback delay $\tau$. With constant input this configuration does not oscillate (range below 1.6 packets) and the indicator stays near zero; with Poisson input it is positive at high load. (c) Share of 200 random configurations whose queue still oscillates with constant input; ``irregular'': more than 20 distinct levels in 200 steps.}
+\label{fig:dyn}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_overload.pdf}
+\caption{Deterministic dynamics under overload (constant input, $\tau=5$). (a) Orbit diagram of $q_1$ against the load for configuration 3318: the fixed point gives way to a widening band of quasi-periodic oscillation near $\lambda_0=72$ and to chaos at $\lambda_0\approx75$, interrupted by periodic windows. (b) Largest Lyapunov exponent of the model along the same sweep. (c, d) Return maps $q_1(t+1)$ and $q_1(t+5)$ against $q_1(t)$ for configuration 972 at $\lambda_0=90$ ($\Lambda=0.20$).}
+\label{fig:overload}
+\end{figure}
+
+A positive Lyapunov estimate of the queue under chaotic forcing could come from two sources: an instability of the queue--TCP loop or the chaotic input passing through the queue. We separated them by removing the chaos from the input. With a constant input the model is a deterministic map in $2+\tau$ dimensions, so its largest Lyapunov exponent $\Lambda$ can be computed exactly (Section~\ref{sec:model}).
+
+\subsubsection{Where the loop is stable}
+We computed $\Lambda$ for all 16,384 configurations at constant loads of 52, 60, 70, 80 and 90 packets per step ($\tau=5$, 3000 transient steps, 5000 steps averaged). At 52 and 60 every configuration converged to a fixed point; the largest exponent was $-0.08$ and $-0.04$. Positive exponents ($\Lambda>0.01$) appeared at 70 (25 configurations, 0.2\%), 80 (277, 1.7\%) and 90 (922, 5.6\%), close to or beyond the service capacity of the switches. All of them have the two steepest drop slopes at the edge ($\kappa_1\ge0.25$; at 70 only $\kappa_1=0.35$). This matches the route to chaos in TCP--RED, where steeper drop curves destabilise the loop \citep{ranjan2004nonlinear}. A longer feedback delay ($\tau=40$) gave similar counts in a sample of 200 configurations.
+
+\subsubsection{What linear analysis predicts}
+Propositions~\ref{prop:fp} and~\ref{prop:lin} explain this pattern. The fixed point of Proposition~\ref{prop:fp} satisfies the simulated map to $10^{-13}$ packets in every configuration, and the roots of \eqref{eq:char} agree with the numerically differentiated map to $10^{-7}$. At loads 52 and 60 the fixed point is linearly stable in all 16,384 configurations. At 70, 80 and 90 it is unstable in 280, 1045 and 1872 configurations, again only for $\kappa_1\ge0.25$ (at 70 only $\kappa_1=0.35$). Every configuration with an unstable fixed point kept oscillating, and every configuration that settled had a stable one; where it settled, the logarithm of the spectral radius reproduced the model exponent (correlation above $0.99$). In the case covered by Proposition~\ref{prop:lin} every unstable fixed point violated the gain condition \eqref{eq:gain}; the converse failed in at most 35 configurations per load, where the loss feedback stabilised a queue that would oscillate on its own. Linear stability is a local property, however. At loads 70--90, 72 to 228 configurations with a stable fixed point did not reach it from an empty network, and 3 (load 80) and 26 (load 90) of them were chaotic: a stable fixed point coexists there with another attractor.
+
+\subsubsection{What the oscillations are}
+For the same 200 random configurations as in Fig.~\ref{fig:dyn}c we classified the long-run behaviour by its period and its exponent. At load 90 and $\tau=5$, 30 configurations oscillate. Of these, 17 settle on periodic orbits (periods 2, 7--9, 14, 16, 28 and 29), all with $\Lambda<0$. Twelve are aperiodic with $\Lambda$ between 0.01 and 0.21, which is deterministic chaos, and one is aperiodic with $\Lambda\approx0$. At load 80, 8 of 22 oscillating configurations are chaotic.
+
+The orbit diagram of one of them (Fig.~\ref{fig:overload}a,b) shows how chaos arises. Apart from narrow windows near $\lambda_0=69$--71, the fixed point persists up to $\lambda_0\approx72$. A band of oscillation then opens with an exponent near zero, the signature of quasi-periodic motion on an invariant circle, and breaks into chaos at $\lambda_0\approx75$. Further up, chaotic bands alternate with periodic windows, some of which come in doubled pairs (periods 14 and 28, 29 and 58). We did not see a period-doubling cascade starting from the fixed point. In the two other chaotic configurations we followed, the fixed point jumped directly to orbits of period 7 or 10, and in one of them to quasi-periodic motion, before chaos set in. Such jumps from a fixed point to a high-period orbit are typical of piecewise-smooth maps \citep{nusse1992border,dibernardo2008piecewise}. Our map is non-smooth because queues are clipped at the buffer size and at zero, and in two of the three configurations the edge buffer overflowed in about 10\% of steps on the attractor.
+
+The return maps (Fig.~\ref{fig:overload}c,d) show a folded, low-dimensional structure rather than a cloud. Series-based diagnostics on 35,000 points of the three most chaotic configurations at load 90 agree with the model. The Rosenstein, Kantz and Wolf-type estimates were 0.12--0.14, 0.17--0.18 and 0.15--0.18 against model exponents of 0.16--0.20. The correlation dimension \citep{grassberger1983characterization} saturated at 0.84--1.3 for embedding dimensions of 7 and above. The 0--1 test \citep{gottwald2004new,gottwald2009implementation} gave $K=1.00$. The permutation entropy of order 6 \citep{bandt2002permutation} was 0.66--0.70, against 0.99--1.00 for shuffled copies of the same series. The queue--TCP loop can therefore be genuinely chaotic, but only at loads of 70 and above with steep drop curves. That is not the regime in which the controller operates.
+
+\subsubsection{Does the arithmetic matter?}
+\label{sec:precision}
+We repeated the computation in single precision, double precision and 50-digit arithmetic, feeding all three the same input. For the three chaotic configurations at load 90, the double-precision trajectory parted from the 50-digit one by more than one packet after 128--217 steps, and the single-precision one after 53--108 steps. This is the order of $\ln(1/\varepsilon)/\Lambda$, which is 172--223 and 76--99 steps for the two machine precisions $\varepsilon$. No computed trajectory of these configurations is therefore the true one beyond a few hundred steps. What we report about them does not depend on the arithmetic. The model exponent was 0.16--0.20 in double precision and 0.16--0.21 with 50 digits, the mean queue length agreed within 0.4 packets, and the distributions of $q_1$ over 5000 steps were statistically indistinguishable (Kolmogorov--Smirnov distance at most 0.02, $p\ge0.16$). In seven stable cases, namely the same configurations at load 52, the configuration of Fig.~\ref{fig:dyn}a under chaotic forcing and the best configuration of each regime, the double-precision and 50-digit trajectories never differed by more than $10^{-13}$ packets over 2000 steps, the single-precision one by $2\times10^{-5}$, and the exponent was negative in both. At the operating load, where all our conclusions about the controller are drawn, rounding errors do not grow.
+
+The chaotic input is itself computed on the same hardware, so we also regenerated it with the logistic map iterated in each arithmetic, from the same initial value and with the same random kicks. The arrival series parted from the 50-digit one after 55--77 steps in double precision and 16--32 steps in single precision, but their mean, standard deviation, lag-1 correlation and permutation entropy agreed within 1\%. We then recomputed the ground truth of 301 configurations (300 random ones and the best) with each version of the input. Mean performance differed by at most 0.3\% of the optimum, the penalised utility by 0.6--0.7\% on average, which is within the seed-to-seed error for 99\% of configurations. The rank correlation between versions was 0.99 or higher, and the best configuration stayed the best. The scores depend on the statistics of the chaotic input, not on its particular trajectory.
+
+\subsection{What the short-window indicator measures}
+\label{sec:indicator}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_indicators.pdf}
+\caption{Instability indicators at the operating load ($\lambda_0=52$, 400-step runs, 50 discarded). (a) Share of test-length runs in which each estimate is positive, for 400 random configurations and four seeds per regime; the model exponent is the conditional exponent of the driven system. (b) Chaotic forcing, all 16,384 configurations: mean short-window indicator against the permutation entropy of $q_1$ (order 4). The dashed line is the flagging threshold.}
+\label{fig:indicators}
+\end{figure}
+
+At the operating load the inputs are random or chaotic, so the relevant exponent is the conditional one: do two copies of the same network, fed the same traffic, drift apart? We computed it for every configuration and each of the 16 ground-truth seeds. Under Poisson and ON/OFF input no configuration had a positive mean exponent, and only 0.01--0.06\% of individual runs did. Under chaotic forcing 170 configurations (1.0\%) had a positive exponent in most runs, the largest mean being 0.03. These are poor configurations (on average they beat only 13\% of the others), mostly with the steepest drop curve. For the remaining 99\% the queue forgets its initial state and becomes a stable function of the input history, a form of generalised synchronisation \citep{rulkov1995generalized}.
+
+The series-based estimates tell a different story (Fig.~\ref{fig:indicators}a). On test-length series ($q_1$ after the first 50 of 400 steps) the short-window indicator exceeded 0.05 in 81--94\% of runs, depending on the regime. The Kantz estimate \citep{kantz1994robust} was positive in 94--99\% and the Wolf-type estimate \citep{wolf1985determining} in 87--97\%, while the model exponent was positive in 0--5\%. Across configurations, the indicator was unrelated to the model exponent (rank correlation $-0.19$ to $0.01$) but closely related to the permutation entropy of the queue (0.83 under chaotic forcing, 0.64 under ON/OFF input; Fig.~\ref{fig:indicators}b). Flagged configurations have irregular queues that are often busy. Unflagged ones have queues that are mostly empty: in a typical run the median share of empty steps was 85--99\% for unflagged configurations and 34--49\% for flagged ones. On a few hundred points, all three estimators respond to the irregularity of a driven series and say little about the stability of the system that produced it, as known for stochastic data \citep{dammig1993estimation}.
+
+The input and the queue are unrelated in this indicator. In the experiment of Fig.~\ref{fig:dyn}a, repeated with 400 seeds, the indicator of the queue ($0.62\pm0.02$) did not depend on that of the logistic-map input ($0.35\pm0.01$) by any of the measures we tried. Pearson $r=0.01$ ($p=0.90$), Spearman $\rho=-0.04$ ($p=0.47$), Kendall $\tau_K=-0.03$ ($p=0.43$), distance correlation $0.08$ (permutation $p=0.77$), $k$-nearest-neighbour mutual information $0$ ($p=1.0$), and a quadratic fit explained $0.2\%$ of the variance ($p=0.68$). The ordinal structure does carry over: the permutation entropies of input and queue were both $0.72$ and weakly rank-correlated ($\rho=0.13$, $p=0.008$). The model exponent of the queue was negative for all 400 seeds (mean $-0.15$). The queue is a contracting filter of a chaotic signal. Its irregularity is inherited, and the indicator's value for the queue reflects how that filter reshapes short windows, not a property of the input or an instability of the queue.
+
+How much of this stability can be proved rather than computed? The bound of Proposition~\ref{prop:bound}, minimised over a grid of 75 weightings, was never below the computed exponent in 786,432 runs, as it must not be. At a constant load of 52 it certifies $\Lambda<0$ for the 8512 configurations (52\%) whose queues both stay empty, by \eqref{eq:underload}. With random inputs it certified 11\% of the Poisson runs, 1.8\% of the ON/OFF runs and none under chaotic forcing, because it needs both queues to be idle in at least 81\% of steps and bursts keep the core queue busy. For the remaining runs the negative exponent is a numerical result.
+
+We therefore read ``chaotic traffic'' in the rest of the paper literally, as an input driven by a chaotic map. We call a configuration ``flagged'' when the indicator exceeds 0.05, and ``unstable'' when its model exponent is positive in most runs.
+
+\subsection{How much memory does the heavy-tailed input have?}
+\label{sec:hurst}
+
+\begin{table}[t]
+\caption{Hurst index of long simulated series ($2^{18}$ steps; queue $2^{17}$) from four estimators, at short scales (8--512 steps, the range a 250-step test sees) and long scales ($\ge1024$ steps, beyond the longest ON/OFF period of 868 steps). ON/OFF arrivals: mean $\pm$ SD over four independent series.}
+\label{tab:hurst}
+\centering\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+ & \multicolumn{4}{c}{Scales 8--512} & \multicolumn{4}{c}{Scales $\ge$1024} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-9}
+Series & DFA-1 & DFA-2 & Wavelet & Periodogram & DFA-1 & DFA-2 & Wavelet & Periodogram \\
+\midrule
+ON/OFF arrivals & $0.820\pm0.005$ & $0.827\pm0.003$ & $0.838\pm0.003$ & $0.84\pm0.04$ & $0.63\pm0.02$ & $0.68\pm0.01$ & $0.59\pm0.05$ & $0.48\pm0.11$ \\
+Active ON/OFF sources & 0.90 & 0.92 & 0.94 & 0.88 & 0.68 & 0.69 & 0.62 & 0.56 \\
+Edge queue under ON/OFF & 0.64 & 0.63 & 0.62 & 0.63 & 0.54 & 0.55 & 0.56 & 0.49 \\
+Poisson arrivals & 0.51 & 0.51 & 0.50 & 0.48 & 0.50 & 0.50 & 0.51 & 0.42 \\
+Logistic-map arrivals & 0.36 & 0.36 & 0.42 & 0.46 & 0.51 & 0.50 & 0.48 & 0.44 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_hurst.pdf}
+\caption{Long memory of the inputs. (a) DFA-1 fluctuation function and (b) wavelet log-scale diagram for ON/OFF arrivals, Poisson arrivals and the edge queue driven by ON/OFF traffic. Shading: scales beyond the longest ON/OFF period.}
+\label{fig:hurst}
+\end{figure}
+
+The value $H=0.82$ used so far is the many-source limit implied by the Pareto shape. To check it we generated four ON/OFF arrival series of $2^{18}$ steps and, as controls, Poisson and logistic-map arrivals and the edge queue driven by ON/OFF traffic (configuration 14590, the optimum of that regime).
+
+\subsubsection{Preconditions}
+A Hurst $H$ index measures time series memory only if the series is stationary and has finite variance \citep{pipiras2017longrange}. The ON/OFF arrival counts are not heavy-tailed: excess kurtosis of values and increments was below 0.05, and the Hill estimate \citep{hill1975simple} of the tail index of the increments was 8.6--9.2. Heavy tails live in the ON/OFF periods (Hill estimates of $\alpha$-stability index were in 1.32--1.41 against the nominal $\alpha=1.36$), not in the counts. The augmented Dickey--Fuller test \citep{dickey1979distribution} rejected a unit root in every series (statistic about $-69$; 5\% critical value $-2.86$). The KPSS statistic \citep{kwiatkowski1992testing} was below its 5\% critical value of 0.463 in three of four series (0.18--0.25) and 0.84 in the fourth, which is expected because long memory inflates KPSS. The means of eight consecutive blocks stayed within 51.2--53.0 packets per step.
+
+\subsubsection{Estimates}
+We used detrended fluctuation analysis of orders 1 and 2 \citep{peng1994mosaic,kantelhardt2001detecting}, the wavelet estimator of \citet{abry1998wavelet} with a Daubechies-3 wavelet, and a log-periodogram regression \citep{geweke1983estimation}. On average all four recover $H$ within 0.03 on synthetic fractional Gaussian noise with $H=0.5$, 0.7 and 0.85. At scales of 8--512 steps the four estimators agree on $H=0.82$--$0.84$ for the ON/OFF arrivals (Table~\ref{tab:hurst}), the nominal value. Beyond about 1000 steps the estimates fall to 0.48--0.68 (Fig.~\ref{fig:hurst}). The generator caps the Pareto periods at 868 steps, so the memory is real but truncated, as with any finite file-size distribution \citep{crovella1997selfsimilarity}. A 250-step test lies entirely in the range where the input is long-range dependent. The edge queue inherits part of this memory ($H\approx0.63$ at short scales), but it is empty most of the time (mean 0.2 packets) and its values are strongly heavy-tailed (excess kurtosis 142), so this estimate should be read with caution. The logistic-map input is anti-persistent at short scales ($H\approx0.36$--$0.46$) and uncorrelated at long ones, as a short-memory chaotic signal should be.
+
+\subsection{The landscape}
+\label{sec:landscape}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_landscape.pdf}
+\caption{The landscape under chaotic forcing, from 16 long runs per configuration. (a) Penalised utility of all configurations as a percentage of the best one. (b) Performance without the penalty against the mean Lyapunov estimate; the dashed line is the flagging threshold. (c) Standard deviation of the performance score from a single 250-step test.}
+\label{fig:landscape}
+\end{figure}
+
+Under chaotic forcing, 70\% of configurations are flagged in most long runs (Fig.~\ref{fig:landscape}b). Flagging goes with \emph{better} performance (correlation 0.45): fast service keeps queues short, and a short queue follows the irregular input closely. A penalty for flagging therefore works against the other goals rather than with them.
+
+With radius-2 neighbourhoods the landscapes are nearly unimodal (Table~\ref{tab:landscape}). Under Poisson and heavy-tailed input there is a single local optimum and it is not flagged. Under chaotic forcing the penalised objective has four local optima, one of them flagged in 10 of 16 runs. The unpenalised objective has one, flagged in 12 of 16.
+
+Whether Proposition~\ref{prop:sep} applies depends on what ``unstable'' means. If $\mathcal C$ is the set of flagged configurations, separation fails under chaotic forcing: the loop converges, in the unpenalised case to a configuration it would itself call unstable. Separation also depends on where the flagging line is drawn, because the counts change if a configuration counts as flagged in more than a quarter, rather than half, of its runs. If $\mathcal C$ is the set of configurations whose model exponent is positive in most runs, separation holds in every regime and objective. Every local optimum has a clearly negative exponent ($-0.13$ to $-3.8$), and every unstable configuration has a stable neighbour that is better. By the model's own criterion the limit of the loop is stable; the short-window indicator calls it unstable because the optimal queue is busy and irregular, not because it diverges.
+
+\begin{table}[t]
+\caption{The exhaustively computed landscapes (16 runs of 400 steps per configuration). ``Flagged'': the short-window indicator exceeds 0.05 in more than half of the runs. ``Unstable'': the model exponent is positive in more than half of the runs. SD: median standard deviation of one 250-step performance score.}
+\label{tab:landscape}
+\centering\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Regime / objective & Flagged & Unstable & Local optima (radius 2) & of which flagged & of which unstable & Test SD \\
+\midrule
+Poisson, penalised & 22\% & 0\% & 1 & 0 & 0 & 0.003 \\
+Heavy-tailed ON/OFF, penalised & 30\% & 0\% & 1 & 0 & 0 & 0.018 \\
+Chaotic forcing, penalised & 70\% & 1.0\% & 4 & 1 & 0 & 0.006 \\
+Chaotic forcing, unpenalised & 70\% & 1.0\% & 1 & 1 & 0 & 0.006 \\
+Chaotic forcing, zero-floor AQM, penalised & 73\% & 1.1\% & 9 & 6 & 0 & 0.006 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Where the curse comes from}
+\label{sec:curse}
+
+The performance part of a single test is quite precise: its standard deviation is about 0.006 under chaotic forcing and 0.003 under Poisson input (Table~\ref{tab:landscape}). Heavy-tailed input makes it about five times larger than Poisson input (0.018). That is the expected footprint of long-range dependence within a 250-step window, where the input has $H\approx0.83$ (Section~\ref{sec:hurst}).
+
+The penalty changes the picture. A configuration flagged in a fraction $f$ of tests loses 0.15 in those tests and nothing in the others, so its score gains a variance of $0.15^2 f(1-f)$. For $f$ near one half this adds a standard deviation of up to 0.075, more than ten times that of performance. In this set-up, what looks like chaos-induced noise is mostly the noise of this indicator.
+
+The curse follows (Fig.~\ref{fig:alloc}b). Under chaotic forcing with the penalty, a controller that tests every new configuration once ends up believing its choice is $9.0\pm1.0$\% of the optimum better than it is (100 rounds). Random search, which never re-tests and compares many unrelated configurations, overestimates by $13.0\pm0.3$\%. Controllers that re-test overestimate by 2--4\%. With the unpenalised objective all policies overestimate by less than 0.7\%.
+
+\subsection{How to spend five tests}
+\label{sec:alloc}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_allocation.pdf}
+\caption{Chaotic forcing, penalised objective, 100 paired replications. (a) Shipped utility for 1--5 new configurations per round of five tests (the rest are re-tests of leaders) at four horizons; crosses mark random search. (b) Belief about the shipped configuration minus its true utility. (c) True utility of the best configuration tested so far minus that of the shipped one.}
+\label{fig:alloc}
+\end{figure}
+
+\begin{table}[t]
+\caption{Chaotic forcing, penalised objective, after 100 rounds (100 paired replications). Differences are paired. ``Flag rate'': mean fraction of long runs in which the shipped configuration is flagged.}
+\label{tab:alloc}
+\centering\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+Policy (new\,/\,re-tests) & Shipped (\%) & Best tested (\%) & Overestimate (\%) & vs.\ test-once (pp) & Flag rate \\
+\midrule
+1\,/\,4 & $92.9\pm0.4$ & $95.0\pm0.3$ & $3.2\pm0.5$ & $+1.3\pm0.7$ & 0.68 \\
+2\,/\,3 & $94.0\pm0.6$ & $96.5\pm0.4$ & $3.7\pm0.7$ & $+2.5\pm0.9$ & 0.52 \\
+3\,/\,2 & $\mathbf{95.6\pm0.7}$ & $97.4\pm0.4$ & $2.2\pm0.8$ & $\mathbf{+4.1\pm1.0}$ & 0.26 \\
+4\,/\,1 & $94.7\pm0.8$ & $97.1\pm0.4$ & $3.1\pm0.8$ & $+3.2\pm1.0$ & 0.30 \\
+5\,/\,0 (test-once) & $91.6\pm0.7$ & $97.1\pm0.4$ & $9.0\pm1.0$ & --- & 0.58 \\
+Random search & $92.2\pm0.3$ & --- & $13.0\pm0.3$ & $+0.6\pm0.7$ & 0.79 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Table~\ref{tab:alloc} and Fig.~\ref{fig:alloc}a show the trade-off. Test-once finds configurations nearly as good as the best policy does (97.1\% best tested, against at most 97.4\%), but it cannot tell which of them is best and ships one 5.5 points worse. A controller with four re-tests per round makes the opposite mistake: it chooses well (gap 2.1 points) but builds only one configuration per round and finds less. Three new configurations and two re-tests balance the two. Its advantage over test-once grows with the horizon: $+1.6\pm1.0\pp$ at 10 rounds, $+3.0\pm1.1$ at 50 and $+4.1\pm1.0$ at 100. Against random search it gains $+3.5\pm0.7\pp$ after 100 rounds, while the policy with four re-tests gains only $+0.7\pm0.5$.
+
+The balanced policy also ships configurations that are flagged less often: in 26\% of long runs against 58\% for test-once and 79\% for random search. Re-testing removes the configurations whose good score came from an unflagged lucky test.
+
+The ranking is not universal. With the unpenalised objective the landscape is easy and nearly noise-free. All policies reach at least 99.86\% after 100 rounds, and in the first 10 rounds random search is ahead of every local policy (by $0.8$--$1.7\pp$), because it samples the whole space.
+
+\subsection{Other traffic and a corrected drop policy}
+\label{sec:robust}
+
+\begin{table}[t]
+\caption{Re-testing against test-once in the other regimes, penalised objective, 100 paired replications. ``1/4'': one new configuration and four re-tests per round; ``3/2'': three and two. Differences are 1/4 minus test-once.}
+\label{tab:robust}
+\centering\small
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+Regime & Rounds & 1/4 (\%) & 3/2 (\%) & Test-once (\%) & Difference (pp) & Overestimate, 1/4\,/\,once (\%) \\
+\midrule
+Poisson & 10 & $98.7\pm0.6$ & $98.9\pm0.4$ & $98.0\pm0.7$ & $+0.7\pm0.8$ & $0.7$\,/\,$1.4$ \\
+ & 100 & $100.0\pm0.0$ & $100.0\pm0.0$ & $99.7\pm0.2$ & $+0.3\pm0.2$ & $0.0$\,/\,$0.3$ \\
+Heavy-tailed ON/OFF & 10 & $96.6\pm0.7$ & $96.1\pm0.8$ & $95.5\pm0.8$ & $+1.2\pm1.0$ & $2.7$\,/\,$4.4$ \\
+ & 100 & $99.3\pm0.3$ & $99.1\pm0.3$ & $98.1\pm0.5$ & $+1.2\pm0.5$ & $1.8$\,/\,$3.1$ \\
+Chaotic, zero-floor AQM & 10 & $93.2\pm0.5$ & $92.9\pm0.7$ & $91.7\pm1.0$ & $+1.5\pm1.0$ & $3.1$\,/\,$7.5$ \\
+ & 100 & $95.5\pm0.3$ & $95.4\pm0.4$ & $93.8\pm0.5$ & $+1.7\pm0.6$ & $4.3$\,/\,$10.4$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The drop curve of Eq.~\eqref{eq:queue} drops packets even from an empty queue: up to 12\% for the gentlest slope and lowest threshold. We therefore repeated the comparison with a ``zero-floor'' variant, $\tilde P(q)=\max\{0,(P(q)-P(0))/(1-P(0))\}$, which drops nothing from an empty queue (Table~\ref{tab:robust}). Re-testing again beat test-once, by $1.7\pm0.6\pp$ after 100 rounds, and test-once again overestimated its choice by about 10\%. But here the split hardly mattered: three new and two re-tests did as well as one and four ($-0.2\pm0.4\pp$), and both did as well as random search ($95.4\pm0.3$).
+
+Heavy-tailed traffic produces a smaller but clear curse. After 100 rounds test-once overestimates by 3.1\% and ships $1.2\pm0.5\pp$ less than one-new-four-re-tests and $1.1\pm0.5\pp$ less than three-new-two-re-tests. Under Poisson input the effects shrink to a few tenths of a point. In neither regime did the two re-testing policies differ by more than half a point.
+
+\subsection{Structural choices}
+\label{sec:ablate}
+
+With one new configuration and four re-tests per round, 50 rounds and 100 paired replications, most structural changes did not matter. Radius 1 instead of 2: $+0.1\pm0.6\pp$. One idea per round instead of five: $-0.7\pm1.0$. Fifteen ideas: $+0.4\pm0.5$. Two did: dropping the 60-step pre-screen cost $1.3\pm1.0\pp$, and unrestricted variants (radius 14) gained $1.5\pm0.8\pp$. The second result fits the near-unimodal landscape. When there are few local optima to be trapped in, long jumps help more than they hurt.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What the controller should do}
+Re-test. In every regime where single tests were noisy enough to matter, testing each candidate once was the worst policy. How much to re-test mattered only in the hardest case, chaotic forcing with the original drop curve, where two re-tests out of five clearly beat four. Elsewhere any split that re-tests did about equally well. This agrees with the static simulations of \citet{kuras2026when}, where one to three new prototypes per five tests also did best. The reason is the same. New candidates raise the best thing tested; re-tests raise the chance of shipping it. Test-once maximises the first and gives up the second.
+
+\subsection{How this relates to earlier findings}
+Noisy evolutionary search often finds that, for a fixed budget, new candidates are a better use of evaluations than repeated ones \citep{fitzpatrick1988genetic,beyer2000evolutionary}. Our opposite result follows from what is being judged. A population is judged by where it moves. A controller is judged by the one configuration it ships, so its loss is a simple regret, and simple regret rewards spending measurements on the leaders \citep{bubeck2011pure}. The tools that tune solvers and databases reached the same conclusion in practice: they keep an incumbent and re-evaluate it as challengers arrive \citep{hutter2009paramils,hutter2011sequential,lopezibanez2016irace}. The fixed 3/2 split is the crudest version of that idea. Adaptive rules that send re-tests to candidates which are both close to the top and uncertain, such as OCBA \citep{chen2000simulation}, the knowledge gradient \citep{frazier2008knowledge} or successive halving \citep{li2018hyperband}, should do at least as well, and comparing them in this model is a natural next step. Our measured bias of the favourite is the classical optimizer's curse \citep{smithwinkler2006}. Selection-corrected intervals \citep{andrews2024inference} would tell a team how much of the favourite's score to believe, but they do not change which configuration is shipped.
+
+\subsection{What the controller should not do}
+Reward a noisy indicator with a hard threshold. The penalty for a positive Lyapunov estimate was meant to make the controller prefer stable queues. Instead it added a coin flip to most scores and made the controller more confident in configurations that were merely lucky. The problem is not the particular estimator. Kantz and Wolf-type estimates on the same windows were positive even more often, and none of the three tracked the model's exponent. A few hundred points of a driven, often-empty queue are not enough to tell instability from irregularity. If stability matters, a better signal is one the controller can average cheaply: queue variance, loss, or the fraction of time above a threshold. Better still, measure it separately and do not fold it into the score as a jump. If a chaos indicator is wanted at all, it needs long series, should be calibrated against surrogate data \citep{theiler1992testing}, and should be complemented by tests designed to tell chaos from noise \citep{gottwald2004new,rosso2007distinguishing}. Where a model of the system exists, its own exponent is the reference.
+
+\subsection{What the theory does and does not promise}
+Because each test in our set-up is an independent replication, the convergence theorem of \citet{kuras2026when} applies unchanged, whatever the correlations inside a test window. The limit is a local optimum of whatever the controller optimises. Whether it is also stable is a property of the landscape (Proposition~\ref{prop:sep}) and of how instability is defined. With the model exponent, separation held everywhere and the limit was stable. With the short-window indicator, it failed for the unpenalised objective. Theory tells the controller where it will end up, not when; at 100 rounds the balanced policy was still 4.4 points below the optimum.
+
+\subsection{Statistical caveats}
+We report many comparisons. The question the study set out to answer was re-testing against test-once. The best split (three new, two re-tests) was identified only after seeing the data, but its advantage over test-once after 100 rounds is about eight standard errors and survives a Bonferroni correction over all twenty allocation-by-horizon comparisons. Smaller differences, around one standard error, should be read as indications rather than findings.
+
+\subsection{Limitations}
+The model is small and stylised. Every test starts from an empty network with a fresh seed, so we do not model the transient after a configuration change or correlation between successive tests. Long-range dependence would matter most in exactly that case, and our results probably understate its effect. The drop curve is a smoothed threshold, not RED, CoDel or PIE. The ON/OFF generator caps its periods at 868 steps, so its long memory is truncated beyond about a thousand steps (Section~\ref{sec:hurst}). The short-window indicator uses 200 points and a 4-step horizon and is biased. Our analytical results are partial: the fixed point and its linear stability are exact, but the bound that holds for any input certifies only a minority of runs, and we have no proof that the exponent is positive where we report chaos. The model exponent is available only because we have the model; in a real network only series-based estimates are, and we showed that they are unreliable on test-length windows. We classified overload dynamics for 200 configurations and followed only three through full orbit diagrams; the counts of chaotic configurations come from the model exponent over all 16,384. Our chaotic input is a logistic map, not measured traffic, and unlike the intermittency maps used as traffic models \citep{erramilli1995application,mondragon2001chaotic} it has short memory. Real traffic may also be closer to Poisson than our heavy-tailed regime at high aggregation \citep{cao2003internet,karagiannis2004longrange}. The balanced allocation was examined only under chaotic forcing with the original drop policy. Finally, the paired comparisons share seeds but not every random draw, because policies consume random numbers at different rates.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+A configuration controller that tests each candidate once believes too much in its choice and ships worse configurations than it has already found. In a simulated two-switch network under chaotic forcing, the size of that loss was set by the noise of the score, not by the chaos as such. A Lyapunov-based stability penalty made the noise more than ten times larger. Testing once shipped configurations 5.5 points worse than the best it had already tested. Splitting each round's five tests into three new configurations and two re-tests of the leaders shipped 4.1 points more than testing once after 100 rounds, beat random search, and shipped configurations flagged as unstable less than half as often. In milder regimes any amount of re-testing helped and the exact split did not matter. The queue--TCP loop of the model can be genuinely chaotic, with a low-dimensional attractor reached through quasi-periodic motion, but only under overload and with steep drop curves. At the operating load its own Lyapunov exponent is negative, and the short-window estimates that called most configurations unstable were measuring the irregularity of a driven queue. Convergence theory transfers to this setting. Whether its limit is also stable depends on how instability is measured: by the model's exponent it is. The next step is a model with persistent state between tests, where long-range dependence can affect the controller through correlated measurements and not only through larger variance.
+
+\section*{Data and code availability}
+{\sloppy Simulation code, the exhaustive ground-truth tables and the raw results are openly available at \url{https://github.com/zxhouse/design-thinking-and-chaos} under the MIT licence. The repository contains the network model (\texttt{chaos\_project/src}), the experiment and analysis scripts (\texttt{chaos\_project/src\_v2}), the raw results (\texttt{chaos\_project/data\_v2}) and the derived summaries and figures (\texttt{results}). Its README lists the commands that reproduce every number and figure in this paper.\par}
+
+\section*{Declaration on the use of AI tools}
+During the preparation of this study, the authors used AI (Anthropic Claude Opus 5.5, Fable 5.1, Sonnet 5.5; Google Gemini 4 Argon; Google Gemini 3.8 Flash; DeepSeek) for help in building the testbed and analysis software, running the experiments and formatting the references and text clarity in multiple text areas. The authors have reviewed and edited the output and take full responsibility for the content of this publication.
+
+\section*{Acknowledgements}
+This work was supported by statutory research funds from Kozminski University, Rzesz{\'o}w University of Technology and Uczelnia Pa{\'n}stwowa im.\ Jana Grodka w Sanoku.
+
+\input{part_bib.tex}
+
+\appendix
+\section{Proofs of Propositions~\ref{prop:fp}--\ref{prop:bound}}
+\label{app:proofs}
+
+Throughout, $h_i(q,a)=q+a\,[1-P_i(q)]$, so that \eqref{eq:queue} reads $q_i^+=\max\{0,\min\{B_i,h_i(q_i,a_i)\}-\mu_i\}$, and $P_i'(q)=\kappa_iP_i(q)[1-P_i(q)]\in(0,\kappa_i/4]$. Switch $i$ serves $\mathrm{dep}_i=\min\{\mu_i,\min\{B_i,h_i\}\}$ packets and drops $a_i-(\min\{B_i,h_i\}-q_i)$. The loss fraction of a step is $\ell=d/M$ with $d$ the packets dropped at both switches and $M=\max\{1,a_1+x\}$; the paced load is $a_1=a\max\{0.4,1-1.8m\}$, where $m$ is the mean of the $\tau$ stored loss values.
+
+\paragraph{Proof of Proposition~\ref{prop:fp}.}
+Fix $a$. The function $q\mapsto a[1-P_i(q)]-\mu_i$ is strictly decreasing. If it is non-positive at $q=0$, then $q=0$ is a fixed point and from any $q>0$ the queue strictly decreases, so there is no other. Otherwise it has a single zero $\tilde q=\theta_i+\kappa_i^{-1}\ln[(a-\mu_i)/\mu_i]>0$. If $\tilde q\le B_i-\mu_i$, clipping is inactive at $\tilde q$ and $\tilde q$ is the only fixed point. If $\tilde q>B_i-\mu_i$, then $h_i(B_i-\mu_i,a)\ge B_i$, so $B_i-\mu_i$ is a fixed point, and it is the only one because $h_i(q,a)-\mu_i>q$ for $q<\tilde q$. This gives \eqref{eq:qstar}. In steady state the departures are $\mathrm{dep}_1(a_1)=\min\{\mu_1,a_1(1-P_1^0)\}$ and $\mathrm{dep}_2=\min\{\mu_2,(\mathrm{dep}_1+c)(1-P_2^0)\}$, and by conservation of packets $d=a_1+c-\mathrm{dep}_2$. As a function of $a_1$, $\mathrm{dep}_2$ is concave, non-decreasing, with slope at most $(1-P_1^0)(1-P_2^0)<1$ and $\mathrm{dep}_2(0)=\min\{\mu_2,c(1-P_2^0)\}>0$. For such a function $\mathrm{dep}_2(a_1)/(a_1+c)$ is strictly decreasing, so the steady-state loss $1-\mathrm{dep}_2/(a_1+c)$ is strictly increasing in $a_1$. Since $a_1$ is non-increasing in $\ell$, $G$ is continuous and non-increasing on $[0,1]$ with values in $[0,1)$, and $\ell=G(\ell)$ has exactly one solution. \qed
+
+\paragraph{Proof of Proposition~\ref{prop:lin}.}
+Under the assumptions no clipping is active in a neighbourhood of the fixed point, the edge switch serves $\mu_1$ packets and the core queue stays empty, so $q_2$ contributes the eigenvalue $0$ and the core switch drops the constant amount $(\mu_1+c)P_2^0$. The remaining dynamics are $q_1^+=q_1+a_1[1-P_1(q_1)]-\mu_1$ and $\ell=[a_1P_1(q_1)+(\mu_1+c)P_2^0]/(a_1+c)$ with $a_1=\lambda_0(1-1.8m)$. At the fixed point $a_1^\star(1-P^\star)=\mu_1$, hence $a_1^\star P_1'(q_1^\star)=\kappa_1\mu_1P^\star=g$. Linearising,
+$\delta q_1^+=(1-g)\,\delta q_1-b\,\delta m$ and $\delta\ell=e\,\delta q_1+f\,\delta m$. Inserting $\delta q_1(t)=Qz^t$, $\delta\ell(t)=Lz^t$ and $\delta m(t)=L\,z^t\,\tau^{-1}\sum_{k=1}^{\tau}z^{-k}$ and eliminating $Q$ and $L$ gives $\chi(z)=0$ after multiplication by $z^\tau$. With $b=f=0$ the roots are $z=1-g$ and $z=0$, and $|1-g|<1$ is \eqref{eq:gain}. \qed
+
+\paragraph{Proof of Proposition~\ref{prop:bound}.}
+The one-step map is continuous and piecewise smooth, so the model exponent is bounded by the time average of the logarithm of its local Lipschitz constant in any norm. We use $\|(q_1,q_2,L)\|=\max\{|q_1|/w_1,\ |q_2|/w_2,\ \max_k\rho^{k}|L_k|\}$, where $L_k$ is the loss value of age $k$. Let two states differ by $\delta$ with $\|\delta\|=N$. Then $|\delta m|\le\sigma N$ and $|\delta a_1|\le1.8a\sigma N$. Ageing multiplies the weighted size of every stored loss value by $\rho$.
+
+\emph{Any step.} Since $\partial h_i/\partial q=1-a_iP_i'\in[1-a_i\kappa_i/4,\,1]$ and $\partial h_i/\partial a\in(0,1)$, and clipping is non-expanding, $|\delta q_1^+|\le\alpha_1|\delta q_1|+|\delta a_1|$, the same bound holds for $|\delta\,\mathrm{dep}_1|$, and $|\delta q_2^+|\le\alpha_2|\delta q_2|+|\delta\,\mathrm{dep}_1|$, with $a_2\le\mu_1+x$. For the drops, $\partial d/\partial a_1\in[0,1]$ (an extra packet is dropped at most once), so $|\partial\ell/\partial a_1|=|\partial d/\partial a_1-\ell|/M\le1/M$; and $|\partial d/\partial q_i|\le\beta_i$ by inspection of the three cases (no overflow and all packets served; no overflow and $\mu_1$ served; overflow). Hence $|\delta\ell|\le(\beta_1w_1+\beta_2w_2+1.8a\sigma)N/M$, and $M\ge\max\{1,0.4a+x\}$. Dividing by the weights gives the three terms of $K$.
+
+\emph{Idle step.} Both queues are mapped to zero on a neighbourhood, so $\delta q_1^+=\delta q_2^+=0$. All packets admitted at the edge are forwarded, and $\ell=[a_1P_1(q_1)+a_2P_2(q_2)]/M$ with $a_2=q_1+a_1[1-P_1(q_1)]+x\le M$. Differentiating at $q_1=q_2=0$: $|\partial\ell/\partial q_1|\le P_1'(0)+P_2^0=c_1$, $|\partial\ell/\partial q_2|\le P_2'(0)=c_2$, and $\partial\ell/\partial a_1=xP_1^0(1-P_2^0)/M^2$ if $M>1$ and $\pi_0$ if $M=1$. Because $a\le2.5\,a_1$, the product $1.8a\,|\partial\ell/\partial a_1|$ is at most $1.125P_1^0$ in the first case and $4.5\pi_0$ in the second, so $|\delta\ell|\le(c_1w_1+c_2w_2+4.5\pi_0\sigma)N$. Together with ageing this gives the idle value of $k_t$.
+
+\emph{Bounded underload.} While $q_1>0$ it decreases by at least $\mu_1-\bar a(1-P_1^0)>0$ per step, so it reaches zero and stays there; then $a_2\le\bar a(1-P_1^0)+\bar x$ and the same argument empties $q_2$. From then on every step is idle. Letting $w_1,w_2\to0$ and taking $\rho=(4.5\pi_0)^{1/\tau}$, for which $4.5\pi_0\sigma\le1$, gives \eqref{eq:underload}; $4.5\pi_0<1$ for every configuration, the largest value being $0.55$. \qed
+
+\end{document}

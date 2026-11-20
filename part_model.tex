@@ -1,0 +1,128 @@
+\section{The model, exactly as simulated}
+\label{sec:model}
+
+This section describes the model exactly as it is simulated, not an idealisation of it; the code is available with the paper (see Data and code availability).
+
+\subsection{Two queues and a sender}
+An edge switch $S_1$ feeds a core switch $S_2$, which also receives cross-traffic (Fig.~\ref{fig:topology}). Time is discrete. In each step switch $i$ receives $A_i(t)$ packets, admits a fraction $1-P_i(q_i)$ of them, truncates at the buffer size $B_i$ and serves up to $\mu_i$ packets:
+\begin{equation}
+q_i(t+1) = \max\!\Big(0,\ \min\big(B_i,\ q_i(t) + A_i(t)\,[1-P_i(q_i(t))]\big) - \mu_i\Big),
+\qquad
+P_i(q) = \frac{1}{1+e^{-\kappa_i (q-\theta_i)}} .
+\label{eq:queue}
+\end{equation}
+The sender scales its offered load by $\max\{0.4,\ 1-1.8\,\bar L(t)\}$, where $\bar L(t)$ is the loss fraction averaged over the last $\tau=5$ steps. $S_2$ receives what $S_1$ served plus cross-traffic with mean 15 packets per step. Buffers are $B_1=120$ and $B_2=140$ packets.
+
+\subsection{Fourteen switches to flip}
+A configuration $p\in\{0,1\}^{14}$ sets the service rates ($\mu_1\in[50,74.5]$, $\mu_2\in[55,79.5]$), the drop thresholds ($\theta_1\in[40,78.5]$, $\theta_2\in[45,83.5]$) and the drop slope at the edge ($\kappa_1\in\{0.05,0.15,0.25,0.35\}$; $\kappa_2=0.12$). There are $2^{14}=16{,}384$ configurations.
+
+\subsection{Three kinds of traffic}
+The rate parameter is $\lambda_0=52$ packets per step in all three regimes. It is the mean offered load under Poisson and ON/OFF traffic; under chaotic forcing the mean is 59 packets per step, because the logistic map averages 0.60, not 0.5.
+(i)~\emph{Poisson}: $A(t)\sim\mathrm{Poisson}(\lambda_0)$.
+(ii)~\emph{Chaotic forcing}: $A(t)=\mathrm{round}\big(\lambda_0[0.3+1.4\,x(t)]\big)$ with $x(t+1)=3.89\,x(t)(1-x(t))$ and a 1\% chance per step of a small kick that keeps the orbit off periodic windows.
+(iii)~\emph{Heavy-tailed ON/OFF}: 32 sources with Pareto ON and OFF periods of shape $\alpha=1.36$, which in the many-source limit gives Hurst index $H=(3-\alpha)/2=0.82$ \citep{willinger1997selfsim}. Periods are capped at about 870 steps by the sampler, and the aggregate rate drives a Poisson count.
+Section~\ref{sec:hurst} checks this value on long simulated series.
+
+\subsection{What a test returns}
+A test deploys $p$ on a \emph{fresh} network (empty queues, new random seed) for 250 steps and returns
+\begin{equation}
+Y = \underbrace{0.5\,\hat T + 0.25\,(1-\hat D) + 0.25\,(1-\hat L)}_{\text{performance}} \;-\; 0.15\cdot\mathbf 1\{\hat\lambda > 0.05\},
+\label{eq:utility}
+\end{equation}
+where $\hat T,\hat D,\hat L$ are throughput, mean queue length and loss rate normalised to $[0,1]$, and $\hat\lambda$ is a Lyapunov estimate of the trajectory $q_1$ (below). We call the first part \emph{performance} and the whole expression the \emph{penalised utility}. Because every test starts from scratch with a new seed, repeated tests of one configuration are independent and identically distributed. This fact matters for the theory in Section~\ref{sec:theory}.
+
+\subsection{Two ways to measure instability}
+The score uses a \emph{short-window indicator} $\hat\lambda$ computed from the series $q_1$ alone. After discarding 50 steps, $q_1$ is embedded with delay 2 in dimension 3. For each of the first 50 points we find the nearest neighbour outside a $\pm5$-step window and average $\tfrac14\ln(d_{t+4}/d_t)$. This is a short-horizon version of the Rosenstein method \citep{rosenstein1993practical}.
+
+Because we have the model, we can also compute the largest Lyapunov exponent of the system itself, which no series-based method can do in a real network. The state of a network is the vector $x=(q_1,q_2,\ell_{t-1},\dots,\ell_{t-\tau})$ of both queues and the $\tau$ stored loss values. We run a second copy from $x+\delta u$ with $\delta=10^{-7}$ and a random unit vector $u$, feed both copies the \emph{same} input, and renormalise the distance to $\delta$ after every step \citep{benettin1980lyapunov}. The average log-stretch per step is the \emph{model exponent} $\Lambda$. With a constant input it is the ordinary largest Lyapunov exponent of a deterministic map. With a random or chaotic input it is the conditional exponent of the driven system: $\Lambda<0$ means that two copies of the same network fed the same traffic converge, the queue is a stable function of its input history \citep{pecora1990synchronization,rulkov1995generalized}, and $\Lambda>0$ means that they diverge. The map is only piecewise smooth (queues are clipped at zero and at the buffer size), so a perturbation can be annihilated exactly; we floor the per-step log-stretch at $-18$ to keep averages finite. The vectorised implementation reproduces the original simulator to $10^{-12}$ packets.
+
+\subsection{What can be proved}
+Three properties of the model can be established analytically; proofs are in Appendix~\ref{app:proofs}. Write $P_i^0=P_i(0)$ and let $c$ be the cross-traffic rate.
+
+\begin{proposition}[Unique fixed point]\label{prop:fp}
+With constant inputs $A(t)=\lambda_0$ and cross-traffic $c$, every configuration has exactly one fixed point $(q_1^\star,q_2^\star,\ell^\star)$. A queue with constant arrivals $a$ rests at
+\begin{equation}
+q_i^\star(a)=\begin{cases}
+0, & a\,(1-P_i^0)\le\mu_i,\\[2pt]
+\min\!\big\{B_i-\mu_i,\ \theta_i+\kappa_i^{-1}\ln\frac{a-\mu_i}{\mu_i}\big\}, & \text{otherwise},
+\end{cases}
+\label{eq:qstar}
+\end{equation}
+and the loss fraction $\ell^\star$ is the unique solution of $\ell=G(\ell)$, where $G$ is the steady-state loss at the paced load $a_1=\lambda_0\max\{0.4,1-1.8\ell\}$ and is non-increasing in $\ell$.
+\end{proposition}
+
+\begin{proposition}[Linear stability under congestion at the edge]\label{prop:lin}
+Suppose that at the fixed point the edge queue is interior ($0<q_1^\star<B_1-\mu_1$), the core queue is empty with slack ($(\mu_1+c)(1-P_2^0)<\mu_2$) and $\ell^\star<1/3$. Let $a_1^\star=\lambda_0(1-1.8\ell^\star)$, $P^\star=1-\mu_1/a_1^\star$ and
+\[
+g=\kappa_1\mu_1P^\star,\quad
+b=1.8\lambda_0(1-P^\star),\quad
+e=\frac{g}{a_1^\star+c},\quad
+f=-\frac{1.8\lambda_0\,[\,cP^\star-(\mu_1+c)P_2^0\,]}{(a_1^\star+c)^2}.
+\]
+The eigenvalues of the one-step map at the fixed point are $0$ and the $\tau+1$ roots of
+\begin{equation}
+\chi(z)=z^{\tau}\,(z-1+g)\;-\;\frac1\tau\big[f\,(z-1+g)-b\,e\big]\sum_{k=0}^{\tau-1}z^{k},
+\label{eq:char}
+\end{equation}
+and the fixed point is locally asymptotically stable if and only if all roots lie inside the unit disc. Without the loss feedback ($b=f=0$) this reduces to $g<2$, that is,
+\begin{equation}
+\kappa_1\,\mu_1\Big(1-\frac{\mu_1}{a_1^\star}\Big)<2 .
+\label{eq:gain}
+\end{equation}
+\end{proposition}
+
+Condition \eqref{eq:gain} is the discrete-time counterpart of the gain condition for RED \citep{ranjan2004nonlinear}: a steeper drop curve (larger $\kappa_1$) and a heavier overload (larger $a_1^\star/\mu_1$) both push the edge queue towards instability.
+
+\begin{proposition}[A bound on the model exponent for any input]\label{prop:bound}
+Call a step \emph{idle} if both queues are empty before it and stay empty with slack, $a_1(1-P_1^0)<\mu_1$ and $[a_1(1-P_1^0)+x](1-P_2^0)<\mu_2$, where $a_1$ is the paced load and $x$ the cross-traffic of that step. Fix $\rho\in(0,1)$ and $w_1,w_2>0$, and let $\sigma=\tau^{-1}\sum_{k=1}^{\tau}\rho^{-k}$, $\pi_0=P_1^0+(1-P_1^0)P_2^0$, $c_1=P_1'(0)+P_2^0$ and $c_2=P_2'(0)$. For any input sequence $(a_t,x_t)$,
+\begin{equation}
+\Lambda\ \le\ \limsup_{T\to\infty}\frac1T\sum_{t=1}^{T}\ln k_t,
+\qquad
+k_t=\begin{cases}
+\rho\,\max\{1,\ c_1w_1+c_2w_2+4.5\,\pi_0\,\sigma\}, & \text{step $t$ idle},\\[2pt]
+K(a_t,x_t), & \text{otherwise},
+\end{cases}
+\label{eq:bound}
+\end{equation}
+where, with $\gamma_1=a\kappa_1/4$, $\gamma_2=(\mu_1+x)\kappa_2/4$, $\beta_i=\max\{1,\gamma_i\}$ and $\alpha_i=\max\{1,\gamma_i-1\}$,
+\[
+K(a,x)=\max\Big\{\alpha_1+\frac{1.8a\sigma}{w_1},\ \ \alpha_2+\frac{\alpha_1w_1+1.8a\sigma}{w_2},\ \ \rho\,\frac{\beta_1w_1+\beta_2w_2+1.8a\sigma}{\max\{1,\,0.4a+x\}}\Big\}.
+\]
+In particular, if the inputs are bounded, $a_t\le\bar a$ and $x_t\le\bar x$, with $\bar a(1-P_1^0)<\mu_1$ and $[\bar a(1-P_1^0)+\bar x](1-P_2^0)<\mu_2$, then from any initial state both queues empty in finite time, every later step is idle and
+\begin{equation}
+\Lambda\ \le\ \frac{1}{\tau}\,\ln\big(4.5\,\pi_0\big)\ <\ 0 .
+\label{eq:underload}
+\end{equation}
+\end{proposition}
+
+The mechanism behind Proposition~\ref{prop:bound} is that an empty queue erases a perturbation exactly: two copies of the network that are both empty differ only in their stored loss values, and those are forgotten at a geometric rate. Busy steps can amplify the difference, by at most $K$. The bound is a sufficient condition and, as Section~\ref{sec:indicator} shows, a conservative one.
+
+\subsection{Ground truth}
+For every configuration and every traffic regime we averaged performance, penalised utility, $\hat\lambda$ and $\Lambda$ over 16 independent 400-step runs, with seeds disjoint from those used by the controller. ``True utility'' below means this table, and ``\% of optimum'' is relative to its maximum over all 16,384 configurations.
+
+\section{The iterate--test controller and what theory guarantees}
+\label{sec:theory}
+
+\subsection{The loop}
+The controller follows the iterate--test core of \citet{kuras2026when}. It keeps every configuration it has tested, with the running mean $M^p$ of its test results. Each round it picks a retained configuration at random and proposes five variants at Hamming distance 1 or 2. It screens them with a 60-step test, builds the $n_{\text{new}}$ most promising, and spends the remaining $5-n_{\text{new}}$ tests re-testing the configurations with the highest $M^p$. The \emph{favourite}, i.e.\ the configuration it would deploy if it had to stop now (``ship''), is $\arg\max_p M^p$. With $n_{\text{new}}=5$ every configuration is tested once (``test-once''). As a reference we also run \emph{random search}: five uniformly random configurations per round, each tested once, and the best observed one is shipped.
+
+\subsection{What carries over from the static theory}
+\citet{kuras2026when} prove that the favourite of such a loop converges almost surely to a local optimum when the space is finite, ideation is local, improving proposals do not die out, tests are unbiased and re-tested, and nothing is discarded. The only assumption that the network could plausibly break is the one about tests. In our set-up it is not broken: a test of $p$ is a draw from a fixed distribution with mean $U(p)$, and successive tests are independent. However strong the correlations \emph{inside} a 250-step window, they only change the variance $\sigma^2(p)$ of a single test, not the independence \emph{between} tests. Hence:
+
+\begin{proposition}\label{prop:carry}
+If each test of $p$ is an independent draw with mean $U(p)$ and bounded support, and the loop satisfies the remaining conditions of \citet{kuras2026when}, then the favourite converges almost surely to a local optimum of $U$ in the Hamming-$r$ neighbourhood.
+\end{proposition}
+
+This is a direct application, not a new theorem. The interesting question is whether the limit is \emph{stable}. Nothing forces it to be, unless instability is costly enough:
+
+\begin{proposition}[Stability of the limit under separation]\label{prop:sep}
+Let $\mathcal C$ be the configurations whose dynamics are unstable by some fixed criterion, for example $\Lambda(p)>0$. Suppose \emph{separation} holds: every $p\in\mathcal C$ has a neighbour $p'\in\mathcal N_r(p)\setminus\mathcal C$ with $U(p')>U(p)$. Then under the conditions of Proposition~\ref{prop:carry} the limit is almost surely outside $\mathcal C$.
+\end{proposition}
+\begin{proof}
+The argument is elementary. By Proposition~\ref{prop:carry} the limit $p^\star$ is a local optimum, so $U(p^\star)\ge U(p')$ for all $p'\in\mathcal N_r(p^\star)$. If $p^\star\in\mathcal C$, separation gives a neighbour with strictly higher utility, which is a contradiction.
+\end{proof}
+
+Separation is a property of the landscape, not of the loop. It can be checked directly on the ground-truth table (Section~\ref{sec:landscape}). A penalty in the objective, such as the $-0.15$ in \eqref{eq:utility}, makes separation more likely but does not guarantee it.
+
+\subsection{What the theory does not say}
+Both propositions are about the limit. They say nothing about how far a team is from it after 50 or 100 rounds, nor about how to split a fixed budget between new configurations and re-tests. Those are empirical questions, and the rest of the paper answers them for this model.
